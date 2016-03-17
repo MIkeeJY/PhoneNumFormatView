@@ -1,8 +1,11 @@
-package com.wcy.phonenumformat;
+package com.ymcx.gamecircle.view;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.os.Message;
 import android.text.Editable;
+import android.text.InputFilter;
+import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -12,16 +15,16 @@ import android.widget.EditText;
  * Created by fzt on 16/2/26.
  */
 public class FormatEditText extends EditText {
-    private int phoneNumLength = 11;
-    private int firstGapPos = 3;
-    private int secondGapPos = 8;
-    boolean firstGapInstert;
-    boolean secondGapInstert;
 
+    boolean shouldStopChange = false;
+    boolean isAddText;
+
+    private WhiteSpaceFilter filter = new WhiteSpaceFilter();
 
     public FormatEditText(Context context) {
         super(context);
         init();
+
     }
 
     public FormatEditText(Context context, AttributeSet attrs) {
@@ -41,6 +44,7 @@ public class FormatEditText extends EditText {
     }
 
     void init() {
+        setFilters(new InputFilter[]{filter});
         addTextChangedListener(new MyTextWatcher(this));
     }
 
@@ -59,6 +63,7 @@ public class FormatEditText extends EditText {
 
         @Override
         public void onTextChanged(CharSequence s, int start, int before, int count) {
+
         }
 
         @Override
@@ -67,58 +72,122 @@ public class FormatEditText extends EditText {
 
         @Override
         public void afterTextChanged(Editable s) {
-            int len = s.length();
-            if (len == 0) {
+
+            if (shouldStopChange) {
+                shouldStopChange = false;
                 return;
             }
-            String str = s.toString();
-            for (int i = 0; i < len; i++) {
-                String sub = str.substring(i, i + 1);
-                if (i == len - 1){
-                    if (TextUtils.isEmpty(sub.trim())) {
-                        s.replace(i, i + 1, "");
-                    }
-                }else if (i == firstGapPos || i == secondGapPos) {
-                    continue;
-                } else {
-                    if (TextUtils.isEmpty(sub.trim())) {
-                        s.replace(i, i + 1, "");
-                    }
-                }
-            }
 
-            len = s.length();
-            if (len < phoneNumLength) {
-                if (len == firstGapPos + 1 && !firstGapInstert) {
-                    firstGapInstert = true;
-                    s.insert(firstGapPos, whiteSpace);
-                } else if (len == secondGapPos + 1 && !secondGapInstert) {
-                    secondGapInstert = true;
-                    s.insert(secondGapPos, whiteSpace);
+            filter.setSpaceEnable(true);
+            String str = s.toString().trim().replaceAll(whiteSpace, "");
+            int len = str.length();
+            int courPos = getSelectionStart();
+            StringBuilder builder = new StringBuilder();
+            if (len <= 3) {
+                shouldStopChange = true;
+                if (courPos > len) {
+                    courPos = len;
                 }
-                if (firstGapInstert && len <= firstGapPos) {
-                    firstGapInstert = false;
+                setText(str);
+                setSelection(courPos);
+            } else if (len > 3 && len <= 7) {
+                for (int i = 0; i < str.length(); i++) {
+                    builder.append(str.charAt(i));
+                    if (i == 2) {
+                        builder.append(whiteSpace);
+                    }
                 }
-                if (secondGapInstert && len <= secondGapPos) {
-                    secondGapInstert = false;
-                }
-            } else if (len == phoneNumLength) {
-                if (!firstGapInstert) {
-                    firstGapInstert = true;
-                    s.insert(firstGapPos, whiteSpace);
+                shouldStopChange = true;
+                if (len == 4) {
+                    if (isAddText) {
+                        courPos += 1;
+                    } else {
+
+                    }
+
+                } else if (len == 7) {
+                    if (isAddText) {
+
+                    } else {
+                    }
                 }
 
-                if (!secondGapInstert) {
-                    secondGapInstert = true;
-                    s.insert(secondGapPos, whiteSpace);
+                if (courPos > builder.length()) {
+                    courPos = builder.length();
                 }
-            } else if (len > phoneNumLength + 2 && firstGapInstert && secondGapInstert) {
-                s.replace(secondGapPos, secondGapPos + 1, "");
-                secondGapInstert = false;
-                s.replace(firstGapPos, firstGapPos + 1, "");
-                firstGapInstert = false;
+                setText(builder.toString());
+                setSelection(courPos);
+            } else if (len > 7 && len <= 11) {
+                for (int i = 0; i < str.length(); i++) {
+                    builder.append(str.charAt(i));
+                    if (i == 2 || i == 6) {
+                        builder.append(whiteSpace);
+                    }
+                }
+
+                if (len == 8) {
+                    if (isAddText) {
+                        if (courPos == 4 || courPos == 9) {
+                            courPos += 1;
+                        }
+                    }
+                } else if (len == 11) {
+                    if (isAddText) {
+
+                    } else {
+                        if (courPos <= 4) {
+
+                        } else if (courPos < 8) {
+                            courPos += 1;
+                        } else if (courPos > 8) {
+                            courPos += 2;
+                        }
+                    }
+                }
+                if (courPos > builder.length()) {
+                    courPos = builder.length();
+                }
+                shouldStopChange = true;
+                setText(builder.toString());
+                setSelection(courPos);
+            } else if (len > 11) {
+                shouldStopChange = true;
+                if (len == 12 && isAddText) {
+                    if (courPos >= 5) {
+                        courPos -= 1;
+                    }
+                    if (courPos >= 9) {
+                        courPos -= 1;
+                    }
+
+                }
+                if (courPos > str.length()) {
+                    courPos = str.length();
+                }
+                setText(str);
+                setSelection(courPos);
             }
+            filter.setSpaceEnable(false);
+
         }
+
+
     }
 
+    class WhiteSpaceFilter implements InputFilter {
+        private boolean enable;
+
+        public void setSpaceEnable(boolean enbale) {
+            this.enable = enbale;
+        }
+
+        @Override
+        public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+            isAddText = start != end;
+            if (TextUtils.isEmpty(source.toString().trim()) && !enable) {
+                return "";
+            }
+            return source;
+        }
+    }
 }
